@@ -1,3 +1,4 @@
+#include <bits/types/struct_timeval.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <stdio.h>
@@ -34,14 +35,38 @@ int main(int argc, char **argv) {
 
 	printf("Server is running. Waiting for connections.\n");
 
+	fd_set rfds, mfds;
+	FD_ZERO(&mfds);
+	FD_SET(socket_fd, &mfds);
+	int mfd = socket_fd;
 	for (;;) {
-		clilen = sizeof(cliaddr);
-		int connfd = accept(socket_fd, (struct sockaddr *) &cliaddr, &clilen);
-		printf("Request received\n");
-		time_t now = time(NULL);
-		char* nows = ctime(&now);
-		send(connfd, nows, strlen(nows), 0);
-		close(connfd);
+	    rfds = mfds;
+		struct timeval tv;
+		tv.tv_sec = 0;
+		tv.tv_usec = 0;
+		select(mfd + 1, &rfds, NULL, NULL, &tv);
+
+		for (int i = 0; i < mfd + 1; ++i) {
+		    if (FD_ISSET(i, &rfds)) {
+				if (i == socket_fd) {
+                    clilen = sizeof(cliaddr);
+                    int connfd = accept(socket_fd, (struct sockaddr *) &cliaddr, &clilen);
+                    FD_SET(connfd, &mfds);
+                    if (mfd < connfd) {
+                        mfd = connfd;
+                    }
+				} else {
+				    int connfd = i;
+                    read(connfd, buf, sizeof(buf));
+    				printf("%s!\n", buf);
+    				printf("Request received\n");
+    				time_t now = time(NULL);
+    				char* nows = ctime(&now);
+    				send(connfd, nows, strlen(nows), 0);
+    				close(connfd);
+				}
+			}
+		}
 	}
 
 	close(socket_fd);

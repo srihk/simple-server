@@ -10,7 +10,7 @@
 int main(int argc, char **argv) {
 	int sockfd;
 	struct sockaddr_in servaddr;
-	char recvline[4096];
+	char sendline[4096], recvline[4096];
 
 	if (argc != 2) {
 		perror("Usage: TCPClient <IP address of the server\n");
@@ -31,6 +31,9 @@ int main(int argc, char **argv) {
 		perror("Problem in connecting to the server\n");
 		exit(3);
 	}
+
+	strcpy(sendline, "time");
+	send(sockfd, sendline, strlen(sendline), 0);
 
 	if (recv(sockfd, recvline, 4096, 0) == 0) {
 		perror("The server terminated prematurely");
