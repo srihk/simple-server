@@ -1,3 +1,4 @@
+#include <asm-generic/errno.h>
 #include <bits/types/struct_timeval.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -8,6 +9,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <fcntl.h>
+#include <aio.h>
 
 #define MAXLINE 4096
 #define SERV_PORT 3000
@@ -17,6 +19,11 @@ int main(int argc, char **argv) {
 	char buf[MAXLINE];
 	socklen_t clilen;
 	struct sockaddr_in cliaddr, servaddr;
+	struct aiocb cbs[1024];
+	memset(cbs, 0, sizeof(cbs));
+	char cbf[1024] = {0};
+	char cbbuf[1024][MAXLINE] = {0};
+	int cnt = 0;
 
 	if (socket_fd == -1) {
 		printf("Couldn't open a socket.\n");
@@ -66,22 +73,46 @@ int main(int argc, char **argv) {
         				char* nows = ctime(&now);
         				send(connfd, nows, strlen(nows), 0);
                     } else {
+                        // Just trigger read here for async io.
+                        printf("Triggering aio read.\n");
+                        memset(&cbs[connfd], 0, sizeof(cbs[connfd]));
+                        memset(&cbbuf[connfd], 0, sizeof(cbbuf[connfd]));
                         int rfd = open(buf, O_RDONLY);
-                        printf("----->%s!\n", buf);
-                        if (rfd == -1) {
-                            printf("Couldn't open the file.\n");
-                            strcpy(buf, "Couldn't open the file.\n");
-                        } else {
-                            read(rfd, buf, sizeof(buf));
+                        memset(buf, 0, sizeof(buf));
+                        cbs[connfd].aio_fildes = rfd;
+                        cbs[connfd].aio_buf = cbbuf[connfd];
+                        cbs[connfd].aio_nbytes = MAXLINE - 1;
+                        cbs[connfd].aio_offset = 0;
+                        cbf[connfd] = 1;
+                        cnt++;
+
+                        if (aio_read(&cbs[connfd]) == -1) {
+                            perror("aio_read error\n");
+                            cnt--;
+                            cbf[connfd] = 0;
                             close(rfd);
                         }
-
-                        send(connfd, buf, strlen(buf), 0);
-                        memset(buf, 0, sizeof(buf));
+                        FD_CLR(i, &mfds);
                     }
-    				
-    				close(connfd);
-                    FD_CLR(connfd, &mfds);
+				}
+			}
+		}
+
+		// After triggering read, now its time to check what all already triggered reads are going on. If any of them is done, send that data back to the client.
+		if (cnt > 0) {
+		    // printf("cnt = %d", cnt);
+		    for (int i = 0; i < 1024; ++i) {
+				if (cbf[i] == 1) {
+				    if (aio_error(&cbs[i]) == 0) {
+						printf("aio_error(&cbs[i]): %d\n", aio_error(&cbs[i]));
+						aio_return(&cbs[i]);
+						send(i, cbbuf[i], strlen(cbbuf[i]), 0);
+						close(i);
+						close(cbs[i].aio_fildes);
+						// FD_CLR(i, &mfds);
+						cnt--;
+						cbf[i] = 0;
+					}
 				}
 			}
 		}
