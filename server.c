@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/select.h>
+#include <fcntl.h>
 
 #define MAXLINE 4096
 #define SERV_PORT 3000
@@ -60,10 +61,27 @@ int main(int argc, char **argv) {
                     read(connfd, buf, sizeof(buf));
     				printf("%s!\n", buf);
     				printf("Request received\n");
-    				time_t now = time(NULL);
-    				char* nows = ctime(&now);
-    				send(connfd, nows, strlen(nows), 0);
+                    if (strcmp(buf, "time") == 0) {
+                        time_t now = time(NULL);
+        				char* nows = ctime(&now);
+        				send(connfd, nows, strlen(nows), 0);
+                    } else {
+                        int rfd = open(buf, O_RDONLY);
+                        printf("----->%s!\n", buf);
+                        if (rfd == -1) {
+                            printf("Couldn't open the file.\n");
+                            strcpy(buf, "Couldn't open the file.\n");
+                        } else {
+                            read(rfd, buf, sizeof(buf));
+                            close(rfd);
+                        }
+
+                        send(connfd, buf, strlen(buf), 0);
+                        memset(buf, 0, sizeof(buf));
+                    }
+    				
     				close(connfd);
+                    FD_CLR(connfd, &mfds);
 				}
 			}
 		}

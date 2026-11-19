@@ -12,9 +12,16 @@ int main(int argc, char **argv) {
 	struct sockaddr_in servaddr;
 	char sendline[4096], recvline[4096];
 
-	if (argc != 2) {
-		perror("Usage: TCPClient <IP address of the server\n");
+	if (argc < 2 || argc > 3) {
+		perror("Usage: TCPClient <IP address of the server> <path>\n");
 		exit(1);
+	}
+
+	if (argc == 3) {
+	    printf("%s!!", argv[2]);
+		strcpy(sendline, argv[2]);
+	} else {
+	    strcpy(sendline, "time");
 	}
 
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -32,7 +39,6 @@ int main(int argc, char **argv) {
 		exit(3);
 	}
 
-	strcpy(sendline, "time");
 	send(sockfd, sendline, strlen(sendline), 0);
 
 	if (recv(sockfd, recvline, 4096, 0) == 0) {
