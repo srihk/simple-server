@@ -10,11 +10,18 @@
 #include <sys/select.h>
 #include <fcntl.h>
 #include <aio.h>
+#include <signal.h>
 
 #define MAXLINE 4096
 #define SERV_PORT 3000
 
+void handle(int arg) {
+    printf("stop wakin' me up! gon hav to clear tha mad cache now! Oh i don' have one yet! better get workin\n");    
+}
+
+
 int main(int argc, char **argv) {
+    signal(SIGHUP, handle);
 	int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 	char buf[MAXLINE];
 	socklen_t clilen;
